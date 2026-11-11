@@ -1,0 +1,46 @@
+name: practice8
+services:
+  user-service:
+    build: ../user-service
+    ports:
+      - "127.0.0.1:5001:5001"
+    volumes:
+      - users-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5001/health', timeout=1)"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  order-service:
+    build: .
+    ports:
+      - "127.0.0.1:5002:5002"
+    environment:
+      USER_SERVICE_URL: http://user-service:5001
+    volumes:
+      - orders-data:/data
+    depends_on:
+      user-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5002/health', timeout=1)"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  gateway:
+    image: nginx:stable-alpine
+    ports:
+      - "127.0.0.1:80:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      user-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+
+volumes:
+  users-data:
+  orders-data:
